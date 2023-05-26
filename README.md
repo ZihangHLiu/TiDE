@@ -1,3 +1,6 @@
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+
 # TiDE
 Implementation of Paper: Long-term Forecasting with TiDE: Time-series Dense Encoder  
 
