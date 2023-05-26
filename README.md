@@ -9,4 +9,4 @@ Related paper: [On the benefits of maximum likelihood estimation for Regression 
 $$
 f : (\{y_{1: L}^{(i)}\}_{i=1}^{N}, \{x_{1:L+H}^{(i)}\}_{i=1}^{N}, \{a^{(i)}\}_{i=1}^{N}) \to \{\hat y_{L+1:L+H}^{(i)}\}_{i=1}^{N}
 $$
-![Alt text](/TiDE/figs/model.png "Model Structure")
+![Alt text](./figs/model.png "Model Structure")
