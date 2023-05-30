@@ -16,9 +16,10 @@ conda activate lzhenv
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1
 
-root=
+root=/scratch/zhliu/repos/TiDE
 cd ${root}
 
+name=TiDE
 print_tofile=True
 datadir=${root}/data
 cuda=True
@@ -29,18 +30,21 @@ cuda=True
 lr=3.82e-5
 ckpt_path=/scratch/zhliu/checkpoints/TiDE/epoch_${epoch}/batch_size_${batch_size}/lr_${lr}
 save_path=${ckpt_path}
+drop_prob=0.3
 
 mkdir -p ${ckpt_path}
 
 cd src
 pwd
 CUDA_VISIBLE_DEVICES=0,1,2,3  python train.py \
+    --name ${name} \
     --print-tofile ${print_tofile} \
     --ckpt_path ${ckpt_path} \
     --datadir ${datadir} \
     --dataset ${dataset} \
-    --save-path ${save_path} \
+    --save_path ${save_path} \
     --epoch ${epoch} \
     --batch_size ${batch_size} \
     --cuda ${cuda} \
     --lr ${lr} \
+    --drop_prob ${drop_prob} \

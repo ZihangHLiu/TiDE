@@ -4,6 +4,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='TiDE model')
 
     # data parameters
+    parser.add_argument('--name', type=str, default='TiDE', help='name of the model')
     parser.add_argument('--print-tofile', type=str, default='True', help='print to file or not')
     parser.add_argument('--datadir', type=str, default='', help='path to the data file')
     parser.add_argument('--ckpt_path', type=str, default='', help='checkpoint path')

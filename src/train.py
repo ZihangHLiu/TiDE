@@ -12,6 +12,12 @@ from torch import LongTensor as LT
 from torch import FloatTensor as FT
 from torch.utils.data import DataLoader
 from dataloader import *
+import json
+
+
+def save_args_to_file(args, output_file_path):
+    with open(output_file_path, "w") as output_file:
+        json.dump(vars(args), output_file, indent=4)
 
 if __name__ == '__main__':
 
@@ -39,24 +45,25 @@ if __name__ == '__main__':
 
     ############################## 2. preprocess and loading the training data ################################
     print('loading the training data...')
-    train_set = Dataset_ETT_hour(root_path=args.datadir, flag='train', data_path=args.dataset + '.csv', features='MS')
-    val_set = Dataset_ETT_hour(root_path=args.datadir, flag='val', data_path=args.dataset + '.csv', features='MS')
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=False, num_workers=6)
-    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=6)
+    ETdir = os.path.join(args.datadir, 'ETDataset', 'ETT-small')
+    train_set = Dataset_ETT_hour(root_path=ETdir, flag='train', data_path=args.dataset + '.csv', features='MS')
+    val_set = Dataset_ETT_hour(root_path=ETdir, flag='val', data_path=args.dataset + '.csv', features='MS')
+    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=False, num_workers=6, drop_last=True)
+    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=6, drop_last=True)
     print('Loading finished. Train data: {}, val data: {}'.format(len(train_set), len(val_set)))
 
     # get sizes
     sizes = {}
     for _, (seq_x, seq_y, seq_x_mark, seq_y_mark) in enumerate(train_loader):
-        sizes['lookback'] = seq_y.shape
-        sizes['attr'] = seq_x.shape
-        sizes['dynCov'] = seq_y_mark.shape
+        sizes['lookback'] = (seq_y.shape[1], seq_y.shape[2])
+        sizes['attr'] = (seq_x.shape[1], seq_x.shape[2])
+        sizes['dynCov'] = (seq_y_mark.shape[1], seq_y_mark.shape[2])
         break
 
     ############################## 3. build the model ################################
     
 
-    model = TiDE(sizes, args)
+    model = TiDEModel(sizes, args)
     # model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
     if args.cuda == 'True':
         model.cuda()
@@ -90,12 +97,13 @@ if __name__ == '__main__':
                 sys.stdout.flush()
             optim.zero_grad()
             if args.cuda == 'True':
-                seq_x = seq_x.cuda()
-                seq_y = seq_y.cuda()
-                seq_x_mark = seq_x_mark.cuda()
-                seq_y_mark = seq_y_mark.cuda()
+                seq_x = seq_x.float().cuda()
+                seq_y = seq_y.float().cuda()
+                # turn marks into float type
+                seq_x_mark = seq_x_mark.float().cuda()
+                seq_y_mark = seq_y_mark.float().cuda()
 
-            pred, ans = model(seq_x, seq_x_mark, seq_y, seq_y_mark)
+            pred, ans = model(seq_x, seq_y, seq_x_mark, seq_y_mark)
             # use MSE loss
             loss = criterion(pred, ans)
             # calculate the MAE loss
@@ -106,14 +114,14 @@ if __name__ == '__main__':
             optim.step()
 
             # print the training stats
-            if step % 1000 == 0:
+            if step % 100 == 0:
                 if train_mse_loss < best_loss:
                     best_loss = train_mse_loss
                     torch.save(model.state_dict(), os.path.join(args.ckpt_path, '{}.pt'.format(args.name)))
                     torch.save(optim.state_dict(), os.path.join(args.ckpt_path, '{}.optim.pt'.format(args.name)))
                     print('Best model saved.')
 
-                print('Epoch: {}, Step: {}, train_mse_loss: {},train_mae_loss: {}'.format(epoch, step, loss.item(), mae_loss.item()))
+                print('Epoch: {}, Step: {}, train_mse_loss: {}, train_mae_loss: {}'.format(epoch, step, loss.item(), mae_loss.item()))
                 sys.stdout.flush()
 
 

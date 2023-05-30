@@ -47,10 +47,11 @@ class TiDEEncoder(nn.Module):
     The input to the encoder layer has to be stacked and flattened, 
     past and future projected covariates: X(1, L + H) has to be projected to lower dimension
     '''
-    def __init__(self, in_features, hid_features, out_features, num_blocks=1):
+    def __init__(self, in_features, hid_features, out_features, drop_prob, num_blocks=1):
+        super(TiDEEncoder, self).__init__()
         self.blocks = nn.ModuleList()
         for i in range(num_blocks):
-            self.blocks.append(ResidualBlock(in_features, hid_features, out_features))
+            self.blocks.append(ResidualBlock(in_features, hid_features, out_features, drop_prob))
             in_features = out_features
 
     def forward(self, x):
@@ -76,10 +77,11 @@ class TiDEDenseDecoder(nn.Module):
     The hidden layer size of the dense encoder is the same as the hidden layer size of the encoder.
     The decoder output size has to be a vector with size p * H, where H is future time steps and p is the expected dimension of decoder output of a single time step vector.
     '''
-    def __init__(self, in_features, hid_features, out_features, num_blocks=1):
+    def __init__(self, in_features, hid_features, out_features, drop_prob, num_blocks=1):
+        super(TiDEDenseDecoder, self).__init__()
         self.blocks = nn.ModuleList()
         for i in range(num_blocks):
-            self.blocks.append(ResidualBlock(in_features, hid_features, out_features))
+            self.blocks.append(ResidualBlock(in_features, hid_features, out_features, drop_prob))
             in_features = out_features
 
     def forward(self, x):
@@ -100,8 +102,9 @@ class TiDETemporalDecoder(nn.Module):
 
     This can be useful if some covariated have a strong direct effect on a particular time-step's actual value
     '''
-    def __init__(self, in_features, hid_features):
-        self.residual = ResidualBlock(in_features, hid_features, 1)
+    def __init__(self, in_features, hid_features, drop_prob):
+        super(TiDETemporalDecoder, self).__init__()
+        self.residual = ResidualBlock(in_features, hid_features, 1, drop_prob)
 
     def forward(self, x):
         '''
@@ -121,6 +124,7 @@ class TiDEModel(nn.Module):
     3. Dynamic covariates X(1: L + H)
     '''
     def __init__(self, sizes, args):
+        super(TiDEModel, self).__init__()
         self.lookback_shape = sizes['lookback']
         self.attr_shape = sizes['attr']
         self.dynCov_shape = sizes['dynCov']
@@ -142,16 +146,15 @@ class TiDEModel(nn.Module):
         self.batch_size = args.batch_size
 
         # the concat shape is the combined size of three flattened tensor
-        self.concat_shape = self.lookback_shape[0] * self.lookback_shape[1] + self.attr_shape[0] * self.attr_shape[1] + self.dynCov_shape[0] * self.dynCov_shape[1]
-
+        self.concat_shape = self.label_len * self.lookback_shape[1] + self.attr_shape[0] * self.attr_shape[1] + self.dynCov_shape[0] * self.feat_size
         # modules
-        self.featproj = ResidualBlock(self.dynCov_shape, self.hidden_size, self.feat_size, self.drop_prob)
-        self.encoder = TiDEEncoder(self.concat_shape, self.hidden_size, self.hidden_size, self.num_encoder_layers)
-        self.denseDecoder = TiDEDenseDecoder(self.hidden_size, self.hidden_size, self.decoder_output_dim * self.pred_len, self.num_decoder_layers)
-        self.temporalDecoder = TiDETemporalDecoder(self.feat_size + self.decoder_output_dim, self.temporal_decoder_hidden)
+        self.featproj = ResidualBlock(self.dynCov_shape[1], self.hidden_size, self.feat_size, self.drop_prob)
+        self.encoder = TiDEEncoder(self.concat_shape, self.hidden_size, self.hidden_size, self.drop_prob, self.num_encoder_layers)
+        self.denseDecoder = TiDEDenseDecoder(self.hidden_size, self.hidden_size, self.decoder_output_dim * self.pred_len, self.drop_prob, self.num_decoder_layers)
+        self.temporalDecoder = TiDETemporalDecoder(self.feat_size + self.decoder_output_dim, self.temporal_decoder_hidden, self.drop_prob)
         self.linear = nn.Linear(self.label_len, self.pred_len)
 
-    def forawrd(self, batch_x, batch_y, batch_x_mark, batch_y_mark):
+    def forward(self, batch_x, batch_y, batch_x_mark, batch_y_mark):
         '''
         batch_x: attributes
         batch_y: look back
@@ -171,7 +174,7 @@ class TiDEModel(nn.Module):
         batch_y_ = batch_y_.view(self.batch_size, -1)
         encoder_input = torch.cat((proj_feature_, batch_x_, batch_y_), dim=1)
 
-        encoded = self.encoder(encoder_input)
+        encoded = self.encoder(encoder_input.float())
 
         # Dense decoder processing
         denseDecoded = self.denseDecoder(encoded)
@@ -187,7 +190,7 @@ class TiDEModel(nn.Module):
 
         # lookback residual
         res_lookback = self.linear(batch_y_)
-        pred = temporalDecoded + res_lookback
+        pred = temporalDecoded + res_lookback.unsqueeze(-1)
         ans = batch_y[:, -self.pred_len:, :]
 
         return pred, ans

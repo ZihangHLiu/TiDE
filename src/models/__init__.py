@@ -1,2 +1,2 @@
-from TiDE import *
-from transformer import *
+from .TiDE import *
+from .transformer import *
