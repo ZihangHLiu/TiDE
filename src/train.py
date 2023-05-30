@@ -14,6 +14,7 @@ from torch import FloatTensor as FT
 from torch.utils.data import DataLoader
 from dataloader import *
 import json
+import time
 
 
 def save_args_to_file(args, output_file_path):
@@ -76,7 +77,8 @@ if __name__ == '__main__':
         'train_mse': [],
         'train_mae': [],
         'val_mse': [],
-        'val_mae': []
+        'val_mae': [],
+        'running_time': []
     }
 
     # flush the output
@@ -86,6 +88,7 @@ if __name__ == '__main__':
     sys.stdout.flush()
 
     ############################## 4. train the model ################################
+    start_time = time.time()
     for epoch in range(1, args.epoch + 1):
         print('batch num: {}'.format(len(train_loader)))
         train_mse_loss = 0.
@@ -120,16 +123,17 @@ if __name__ == '__main__':
 
             # print the training stats
             if step % 100 == 0:
-                if train_mse_loss < best_loss:
-                    best_loss = train_mse_loss
-                    torch.save(model.state_dict(), os.path.join(args.ckpt_path, '{}.pt'.format(args.name)))
-                    torch.save(optim.state_dict(), os.path.join(args.ckpt_path, '{}.optim.pt'.format(args.name)))
-                    print('Best model saved.')
 
                 # test the model on val set
                 val_mse_loss, val_mae_loss = test(args, model, val_loader, criterion)
                 test_mse_loss += val_mse_loss / 10
                 test_mae_loss += val_mae_loss / 10
+
+                if val_mse_loss < best_loss:
+                    best_loss = val_mse_loss
+                    torch.save(model.state_dict(), os.path.join(args.ckpt_path, '{}.pt'.format(args.name)))
+                    torch.save(optim.state_dict(), os.path.join(args.ckpt_path, '{}.optim.pt'.format(args.name)))
+                    print('Best model saved.')
 
                 print('Epoch: {}, Step: {}, train_mse: {}, train_mae: {}, val_mse: {}, val_mae: {}'.format(epoch, step, loss.item(), mae_loss.item(), val_mse_loss, val_mae_loss))
                 sys.stdout.flush()
@@ -150,6 +154,10 @@ if __name__ == '__main__':
         # flush the output
         sys.stdout.flush()
 
+    end_time = time.time()
+    total_time = end_time - start_time
+    print('Total running time: {} seconds'.format(total_time))
+    training_stats['running_time'].append(total_time)
 
     np.save(os.path.join(args.ckpt_path, "training_stats.npy"), training_stats)
 
