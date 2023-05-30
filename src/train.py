@@ -1,5 +1,6 @@
 from parse_args import *
 from models import *
+from test import *
 import os
 import sys
 import numpy as np
@@ -72,8 +73,10 @@ if __name__ == '__main__':
 
     training_stats = {
         'epoch': [],
-        'mse_loss': [],
-        'mae_loss': [],
+        'train_mse': [],
+        'train_mae': [],
+        'val_mse': [],
+        'val_mae': []
     }
 
     # flush the output
@@ -87,6 +90,8 @@ if __name__ == '__main__':
         print('batch num: {}'.format(len(train_loader)))
         train_mse_loss = 0.
         train_mae_loss = 0.
+        test_mse_loss = 0.
+        test_mae_loss = 0.
         best_loss = 9999
         step = 0
         print('Starting epoch: {}'.format(epoch))
@@ -121,18 +126,25 @@ if __name__ == '__main__':
                     torch.save(optim.state_dict(), os.path.join(args.ckpt_path, '{}.optim.pt'.format(args.name)))
                     print('Best model saved.')
 
-                print('Epoch: {}, Step: {}, train_mse_loss: {}, train_mae_loss: {}'.format(epoch, step, loss.item(), mae_loss.item()))
+                # test the model on val set
+                val_mse_loss, val_mae_loss = test(args, model, val_loader, criterion)
+                test_mse_loss += val_mse_loss / 10
+                test_mae_loss += val_mae_loss / 10
+
+                print('Epoch: {}, Step: {}, train_mse: {}, train_mae: {}, val_mse: {}, val_mae: {}'.format(epoch, step, loss.item(), mae_loss.item(), val_mse_loss, val_mae_loss))
                 sys.stdout.flush()
 
 
         train_mse_loss /= step
         train_mae_loss /= step
-        print('Finished Epoch: {}, mse_loss: {}, mae_loss: {}'.format(epoch, train_mse_loss, train_mae_loss))
+        print('Finished Epoch: {}, train_mse_loss: {}, train_mae_loss: {}, test_mse_loss: {}, test_mae_loss: {}'.format(epoch, train_mse_loss, train_mae_loss, test_mse_loss, test_mae_loss))
 
         # update training stats
         training_stats['epoch'].append(epoch)
-        training_stats['mse_loss'].append(train_mse_loss)
-        training_stats['mae_loss'].append(train_mae_loss)
+        training_stats['train_mse'].append(train_mse_loss)
+        training_stats['train_mae'].append(train_mae_loss)
+        training_stats['val_mse'].append(test_mse_loss)
+        training_stats['val_mae'].append(test_mae_loss)
 
 
         # flush the output
